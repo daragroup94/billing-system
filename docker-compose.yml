@@ -1,0 +1,76 @@
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: isp_billing_db
+    restart: always
+    environment:
+      POSTGRES_USER: ispbilling
+      POSTGRES_PASSWORD: ispbilling123
+      POSTGRES_DB: isp_billing
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - isp_network
+
+  # Backend API (Node.js + Express)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: isp_billing_backend
+    restart: always
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://ispbilling:ispbilling123@postgres:5432/isp_billing
+      JWT_SECRET: your_super_secret_jwt_key_change_this_in_production
+      WHATSAPP_API_KEY: your_whatsapp_api_key_here
+    ports:
+      - "3005:3000"
+    depends_on:
+      - postgres
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    networks:
+      - isp_network
+
+  # Frontend (React + Vite)
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: isp_billing_frontend
+    restart: always
+    environment:
+      VITE_API_URL: http://backend:3000/api
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+    networks:
+      - isp_network
+
+  # Redis for caching & real-time notifications
+  redis:
+    image: redis:7-alpine
+    container_name: isp_billing_redis
+    restart: always
+    ports:
+      - "6378:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - isp_network
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  isp_network:
+    driver: bridge
