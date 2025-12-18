@@ -79,7 +79,6 @@ export default function Settings() {
                     <Input
                       id="company_name"
                       placeholder="PT. Internet Cepat Indonesia"
-                      defaultValue="ISP Billing"
                     />
                   </div>
                   <div className="space-y-2">
@@ -88,7 +87,6 @@ export default function Settings() {
                       id="email"
                       type="email"
                       placeholder="info@example.com"
-                      defaultValue="admin@ispbilling.com"
                     />
                   </div>
                   <div className="space-y-2">
@@ -96,7 +94,6 @@ export default function Settings() {
                     <Input
                       id="phone"
                       placeholder="+62 812 3456 7890"
-                      defaultValue="+62 812 3456 7890"
                     />
                   </div>
                   <div className="space-y-2">
@@ -104,7 +101,6 @@ export default function Settings() {
                     <Input
                       id="website"
                       placeholder="https://www.example.com"
-                      defaultValue="https://ispbilling.com"
                     />
                   </div>
                   <div className="space-y-2 md:col-span-2">
@@ -112,7 +108,6 @@ export default function Settings() {
                     <Input
                       id="address"
                       placeholder="Jl. Contoh No. 123, Jakarta"
-                      defaultValue="Jl. Sudirman No. 123, Jakarta Pusat"
                     />
                   </div>
                 </div>
