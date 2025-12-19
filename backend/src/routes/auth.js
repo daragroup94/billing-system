@@ -1,132 +1,102 @@
 const express = require('express');
 const router = express.Router();
-const bcrypt = require('bcryptjs');
+const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const { body, validationResult } = require('express-validator');
 const pool = require('../config/database');
+const authMiddleware = require('../middleware/auth');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your_super_secret_jwt_key';
-
-// Login
-router.post('/login', [
-  body('email').isEmail().normalizeEmail(),
-  body('password').notEmpty()
-], async (req, res) => {
+// Login route
+router.post('/login', async (req, res) => {
   try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
-    }
-
     const { email, password } = req.body;
 
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email dan password harus diisi' });
+    }
+
     const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
-    
     if (result.rows.length === 0) {
-      return res.status(401).json({ error: 'Invalid credentials' });
+      return res.status(401).json({ error: 'Email atau password salah' });
     }
 
     const user = result.rows[0];
-    const isValidPassword = await bcrypt.compare(password, user.password);
+    const isPasswordValid = await bcrypt.compare(password, user.password);
 
-    if (!isValidPassword) {
-      return res.status(401).json({ error: 'Invalid credentials' });
+    if (!isPasswordValid) {
+      return res.status(401).json({ error: 'Email atau password salah' });
     }
 
     const token = jwt.sign(
-      { id: user.id, email: user.email, role: user.role },
-      JWT_SECRET,
-      { expiresIn: '24h' }
+      { id: user.id, email: user.email, name: user.name, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: '1d' }
     );
 
     res.json({
+      message: 'Login berhasil',
       token,
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        role: user.role
-      }
+      user: { id: user.id, email: user.email, name: user.name, role: user.role }
     });
+
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-// Register
-router.post('/register', [
-  body('email').isEmail().normalizeEmail(),
-  body('password').isLength({ min: 6 }),
-  body('name').notEmpty()
-], async (req, res) => {
+// Verify token
+router.get('/verify', authMiddleware, async (req, res) => {
   try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
-    }
-
-    const { email, password, name } = req.body;
-
-    const existingUser = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
-    
-    if (existingUser.rows.length > 0) {
-      return res.status(400).json({ error: 'User already exists' });
-    }
-
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    const result = await pool.query(
-      'INSERT INTO users (email, password, name, role) VALUES ($1, $2, $3, $4) RETURNING id, email, name, role',
-      [email, hashedPassword, name, 'admin']
-    );
-
-    const user = result.rows[0];
-
-    const token = jwt.sign(
-      { id: user.id, email: user.email, role: user.role },
-      JWT_SECRET,
-      { expiresIn: '24h' }
-    );
-
-    res.status(201).json({
-      token,
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        role: user.role
-      }
-    });
+    res.json({ user: req.user });
   } catch (error) {
-    console.error('Register error:', error);
+    console.error('Verify error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-// Verify token
-router.get('/verify', async (req, res) => {
+// Change password route (HARUS PAKAI authMiddleware)
+router.put('/change-password', authMiddleware, async (req, res) => {
   try {
-    const token = req.headers.authorization?.split(' ')[1];
-    
-    if (!token) {
-      return res.status(401).json({ error: 'No token provided' });
+    const userId = req.user.id;
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ error: 'Password lama dan baru harus diisi' });
     }
 
-    const decoded = jwt.verify(token, JWT_SECRET);
-    
-    const result = await pool.query(
-      'SELECT id, email, name, role FROM users WHERE id = $1',
-      [decoded.id]
+    if (newPassword.length < 6) {
+      return res.status(400).json({ error: 'Password baru minimal 6 karakter' });
+    }
+
+    // Get current password hash
+    const userResult = await pool.query('SELECT password FROM users WHERE id = $1', [userId]);
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: 'User tidak ditemukan' });
+    }
+
+    const hashedPassword = userResult.rows[0].password;
+
+    // Verify current password
+    const isPasswordValid = await bcrypt.compare(currentPassword, hashedPassword);
+    if (!isPasswordValid) {
+      return res.status(401).json({ error: 'Password lama salah' });
+    }
+
+    // Hash new password
+    const saltRounds = 10;
+    const newHashedPassword = await bcrypt.hash(newPassword, saltRounds);
+
+    // Update password
+    await pool.query(
+      'UPDATE users SET password = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+      [newHashedPassword, userId]
     );
 
-    if (result.rows.length === 0) {
-      return res.status(401).json({ error: 'User not found' });
-    }
+    res.json({ message: 'Password berhasil diubah' });
 
-    res.json({ user: result.rows[0] });
   } catch (error) {
-    res.status(401).json({ error: 'Invalid token' });
+    console.error('Change password error:', error);
+    res.status(500).json({ error: 'Terjadi kesalahan server' });
   }
 });
 

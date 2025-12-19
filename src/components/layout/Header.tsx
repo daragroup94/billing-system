@@ -1,8 +1,27 @@
-import { Bell, Search, User } from "lucide-react";
+// src/components/layout/Header.tsx
+
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Bell, LogOut, Search, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useToast } from '@/hooks/use-toast';
 
 export function Header() {
+  const navigate = useNavigate();
+  const { toast } = useToast();
+
+  // Fungsi untuk menangani logout
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    toast({
+      title: "Berhasil Keluar",
+      description: "Anda telah keluar dari sistem.",
+    });
+    navigate('/login');
+  };
+
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-card/80 backdrop-blur-sm px-6">
       {/* Search */}
@@ -34,6 +53,15 @@ export function Header() {
             <p className="text-sm font-medium text-foreground">Admin</p>
             <p className="text-xs text-muted-foreground">admin@isp.com</p>
           </div>
+          {/* --- TAMBAHKAN TOMBOL LOGOUT --- */}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleLogout}
+            title="Keluar"
+          >
+            <LogOut className="h-5 w-5" />
+          </Button>
         </div>
       </div>
     </header>

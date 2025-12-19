@@ -1,6 +1,6 @@
 services:
   # PostgreSQL Database
-  postgres:
+  billing-postgres: # <-- PERUBAHAN: Nama layanan diubah dari 'postgres' menjadi 'billing-postgres' untuk menghindari konflik
     image: postgres:15-alpine
     container_name: isp_billing_db
     restart: always
@@ -14,7 +14,8 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./backend/init.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
-      - isp_network
+      my-net:
+        ipv4_address: 172.100.10.205
 
   # Backend API (Node.js + Express)
   backend:
@@ -26,34 +27,48 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3000
-      DATABASE_URL: postgresql://ispbilling:ispbilling123@postgres:5432/isp_billing
+      # DATABASE_URL menggunakan 'container_name' yang unik, ini sudah benar
+      DATABASE_URL: postgresql://ispbilling:ispbilling123@isp_billing_db:5432/isp_billing
       JWT_SECRET: your_super_secret_jwt_key_change_this_in_production
       WHATSAPP_API_KEY: your_whatsapp_api_key_here
     ports:
       - "3005:3000"
     depends_on:
-      - postgres
+      - billing-postgres # <-- PERUBAHAN: 'depends_on' menunjuk ke nama layanan yang baru
     volumes:
       - ./backend:/app
       - /app/node_modules
     networks:
-      - isp_network
+      my-net:
+        ipv4_address: 172.100.10.206
 
   # Frontend (React + Vite)
   frontend:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        VITE_API_URL: /api
     container_name: isp_billing_frontend
     restart: always
-    environment:
-      VITE_API_URL: http://backend:3000/api
     ports:
       - "8080:80"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.billing.entrypoints=web"
+      - "traefik.http.routers.billing.rule=Host(`billing.access.daranett.com`)"
+      - "traefik.http.routers.billing.middlewares=https-redirect"
+      - "traefik.http.middlewares.https-redirect.redirectscheme.scheme=https"
+      - "traefik.http.routers.billing-secure.entrypoints=websecure"
+      - "traefik.http.routers.billing-secure.rule=Host(`billing.access.daranett.com`)"
+      - "traefik.http.routers.billing-secure.tls=true"
+      - "traefik.http.routers.billing-secure.service=billing"
+      - "traefik.http.services.billing.loadbalancer.server.port=80"
     depends_on:
       - backend
     networks:
-      - isp_network
+      my-net:
+        ipv4_address: 172.100.10.207
 
   # Redis for caching & real-time notifications
   redis:
@@ -65,12 +80,14 @@ services:
     volumes:
       - redis_data:/data
     networks:
-      - isp_network
+      my-net:
+        ipv4_address: 172.100.10.208
 
 volumes:
   postgres_data:
   redis_data:
 
 networks:
-  isp_network:
-    driver: bridge
+  my-net:
+    driver: local
+    external: true

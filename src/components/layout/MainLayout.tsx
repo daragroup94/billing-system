@@ -1,3 +1,4 @@
+// src/components/layout/MainLayout.tsx
 import { ReactNode } from "react";
 import { Sidebar } from "./Sidebar";
 import { Header } from "./Header";

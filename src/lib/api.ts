@@ -16,6 +16,8 @@ api.interceptors.request.use((config) => {
 export const authAPI = {
   login: (credentials: any) => api.post('/auth/login', credentials),
   verify: () => api.get('/auth/verify'),
+  changePassword: (data: { currentPassword: string; newPassword: string }) => 
+    api.put('/auth/change-password', data),
 };
 
 export const customerAPI = {
@@ -27,6 +29,12 @@ export const customerAPI = {
 
 export const dashboardAPI = {
   getStats: () => api.get('/dashboard/stats'),
+  getRevenueChart: () => api.get('/dashboard/revenue-chart'),
+};
+
+export const settingsAPI = {
+  getAll: () => api.get('/settings'),
+  update: (key: string, value: any) => api.put(`/settings/${key}`, { value }),
 };
 
 export default api;

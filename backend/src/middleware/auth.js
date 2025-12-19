@@ -1,20 +1,26 @@
+// backend/src/middleware/auth.js
+
 const jwt = require('jsonwebtoken');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your_super_secret_jwt_key';
-
 const authMiddleware = (req, res, next) => {
-  try {
-    const token = req.headers.authorization?.split(' ')[1];
-    
-    if (!token) {
-      return res.status(401).json({ error: 'No token provided' });
-    }
+  // Ambil token dari header Authorization
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1]; // Bearer <token>
 
-    const decoded = jwt.verify(token, JWT_SECRET);
-    req.user = decoded;
-    next();
+  if (!token) {
+    return res.status(401).json({ error: 'Access denied. No token provided.' });
+  }
+
+  try {
+    // Verifikasi token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    
+    // Tambahkan data user ke request object
+    req.user = decoded; 
+    
+    next(); // Lanjut ke request berikutnya
   } catch (error) {
-    return res.status(401).json({ error: 'Invalid token' });
+    return res.status(401).json({ error: 'Invalid token.' });
   }
 };
 
